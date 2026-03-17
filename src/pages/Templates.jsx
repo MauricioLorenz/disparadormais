@@ -34,7 +34,9 @@ export default function Templates() {
       setIsModalOpen(false);
       carregarTemplates();
     } catch (error) {
-      alert('Erro ao salvar template: ' + error.response?.data?.error || error.message);
+      const errObj = error.response?.data?.error;
+      const errMsg = errObj?.message || (typeof errObj === 'string' ? errObj : JSON.stringify(errObj)) || error.message;
+      alert('Erro ao salvar template: ' + errMsg);
     }
   };
 
