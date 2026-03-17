@@ -26,15 +26,22 @@ app.use('/api/disparos', disparosRoutes);
 
 // Inicializar banco e subir servidor
 const PORT = process.env.PORT || 3001;
-initDb()
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`Servidor rodando na porta ${PORT}`);
+
+// Se não estiver no Vercel, iniciar o servidor localmente
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  initDb()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`Servidor rodando na porta ${PORT}`);
+      });
+    })
+    .catch((err) => {
+      console.error('Falha ao inicializar banco de dados:', err);
+      process.exit(1);
     });
-  })
-  .catch((err) => {
-    console.error('Falha ao inicializar banco de dados:', err);
-    process.exit(1);
-  });
+} else {
+  // Para Vercel: inicializa o DB de forma "lazy" (ou pode depender da rota principal) e exporta o app.
+  initDb().catch(console.error);
+}
 
 export default app;
