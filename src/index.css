@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-zinc-950 text-zinc-100 font-sans antialiased;
+  }
+}
+
+@layer components {
+  /* Botões principais da aplicação */
+  .btn-primary {
+    @apply bg-brand-600 hover:bg-brand-500 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2;
+  }
+  
+  /* Botões secundários ou de cancelar */
+  .btn-secondary {
+    @apply bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2;
+  }
+
+  /* Cards e painéis */
+  .panel {
+    @apply bg-zinc-900 border border-zinc-800 rounded-xl shadow-lg p-6;
+  }
+
+  /* Inputs padrão */
+  .input-field {
+    @apply w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-zinc-100 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder:text-zinc-500;
+  }
+
+  /* Labels */
+  .label-field {
+    @apply block text-sm font-medium text-zinc-400 mb-1.5;
+  }
+}
+
+/* Scrollbar Customizada (Opcional, mas dá um toque premium) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #09090b; 
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a; 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46; 
+}
