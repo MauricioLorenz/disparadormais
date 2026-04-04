@@ -1,0 +1,176 @@
+═══════════════════════════════════════════════════════════════════════════════
+📡 CURL RÁPIDO - COPIE E COLE NO TERMINAL
+═══════════════════════════════════════════════════════════════════════════════
+
+🌐 VERCEL (Produção) - substitua SEU-PROJETO pelo nome real
+───────────────────────────────────────────────────────────────────────────────
+
+curl -X POST https://SEU-PROJETO.vercel.app/api/clientes \
+  -H "Content-Type: application/json" \
+  -d '{"nome":"Meu Cliente","telefone":"5548999999999","estados_interesse":"SP, RJ","cache_tier":["$","$$"],"ativo":true}'
+
+curl -X POST https://SEU-PROJETO.vercel.app/api/ofertas \
+  -H "Content-Type: application/json" \
+  -d '{"artista":"Gusttavo Lima","data":"2026-04-04","estados":"SP, RJ","cache_medio":150000}'
+
+curl -X GET https://SEU-PROJETO.vercel.app/api/disparos \
+  -H "Content-Type: application/json"
+
+
+🖥️  LOCAL (Desenvolvimento)
+───────────────────────────────────────────────────────────────────────────────
+
+✅ PASSO 1: CRIAR CLIENTE
+───────────────────────────────────────────────────────────────────────────────
+
+curl -X POST http://localhost:3001/api/clientes \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nome": "Meu Cliente Teste",
+    "telefone": "5548999999999",
+    "estados_interesse": "SP, RJ, MG",
+    "cache_tier": ["$", "$$", "$$$"],
+    "ativo": true
+  }'
+
+
+✅ PASSO 2: DISPARAR OFERTA
+───────────────────────────────────────────────────────────────────────────────
+
+curl -X POST http://localhost:3001/api/ofertas \
+  -H "Content-Type: application/json" \
+  -d '{
+    "artista": "Gusttavo Lima",
+    "data": "2026-04-04",
+    "estados": "SP, RJ, MG",
+    "cache_medio": 150000
+  }'
+
+
+✅ PASSO 3: LISTAR DISPAROS
+───────────────────────────────────────────────────────────────────────────────
+
+curl -X GET http://localhost:3001/api/disparos \
+  -H "Content-Type: application/json"
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🎯 EXEMPLOS EXTRAS
+═══════════════════════════════════════════════════════════════════════════════
+
+📤 DISPARAR OFERTA ALTO CACHÊ
+───────────────────────────────────────────────────────────────────────────────
+
+curl -X POST http://localhost:3001/api/ofertas \
+  -H "Content-Type: application/json" \
+  -d '{
+    "artista": "Bruno & Marrone",
+    "data": "2026-04-04",
+    "estados": "SP, RJ, BA, MG, RS",
+    "cache_medio": 750000
+  }'
+
+
+📤 DISPARAR OFERTA BAIXO CACHÊ
+───────────────────────────────────────────────────────────────────────────────
+
+curl -X POST http://localhost:3001/api/ofertas \
+  -H "Content-Type: application/json" \
+  -d '{
+    "artista": "Wesley Safadão",
+    "data": "2026-04-04",
+    "estados": "BA, PE, CE",
+    "cache_medio": 80000
+  }'
+
+
+👤 CRIAR CLIENTE VIP (APENAS ALTO CACHÊ)
+───────────────────────────────────────────────────────────────────────────────
+
+curl -X POST http://localhost:3001/api/clientes \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nome": "Cliente VIP Premium",
+    "telefone": "5548988888888",
+    "estados_interesse": "SP, RJ",
+    "cache_tier": ["$$$$", "$$$$$"],
+    "ativo": true
+  }'
+
+
+👤 CRIAR CLIENTE PREMIUM (TODOS OS CACHÊS)
+───────────────────────────────────────────────────────────────────────────────
+
+curl -X POST http://localhost:3001/api/clientes \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nome": "Cliente Premium Nacional",
+    "telefone": "5548977777777",
+    "estados_interesse": "AC, AL, AP, AM, BA, CE, DF, ES, GO, MA, MT, MS, MG, PA, PB, PR, PE, PI, RJ, RN, RS, RO, RR, SC, SP, SE, TO",
+    "cache_tier": ["$", "$$", "$$$", "$$$$", "$$$$$"],
+    "ativo": true
+  }'
+
+
+📋 LISTAR CLIENTES
+───────────────────────────────────────────────────────────────────────────────
+
+curl -X GET http://localhost:3001/api/clientes \
+  -H "Content-Type: application/json"
+
+
+📋 LISTAR OFERTAS
+───────────────────────────────────────────────────────────────────────────────
+
+curl -X GET http://localhost:3001/api/ofertas \
+  -H "Content-Type: application/json"
+
+
+═══════════════════════════════════════════════════════════════════════════════
+⚡ VERSÃO COMPACTA (UMA LINHA)
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ CRIAR CLIENTE (UMA LINHA)
+curl -X POST http://localhost:3001/api/clientes -H "Content-Type: application/json" -d '{"nome":"Teste","telefone":"5548999999999","estados_interesse":"SP, RJ","cache_tier":["$","$$"],"ativo":true}'
+
+✅ DISPARAR OFERTA (UMA LINHA)
+curl -X POST http://localhost:3001/api/ofertas -H "Content-Type: application/json" -d '{"artista":"Gusttavo Lima","data":"2026-04-04","estados":"SP, RJ","cache_medio":150000}'
+
+✅ LISTAR DISPAROS (UMA LINHA)
+curl -X GET http://localhost:3001/api/disparos -H "Content-Type: application/json"
+
+
+═══════════════════════════════════════════════════════════════════════════════
+📊 RESPOSTA ESPERADA
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ SUCESSO (201 Created)
+{
+  "id": 1,
+  "artista": "Gusttavo Lima",
+  "data": "2026-04-04",
+  "estados": "SP, RJ, MG",
+  "cache_medio": 150000,
+  "timestamp": "2026-04-04T10:30:00Z"
+}
+
+❌ ERRO (400 Bad Request)
+{
+  "erro": "Todos os campos são obrigatórios"
+}
+
+═══════════════════════════════════════════════════════════════════════════════
+💡 DICAS
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Certifique-se que o servidor está rodando:
+   cd server && npm start
+
+2. Use a ferramenta Postman (https://www.postman.com) para testes gráficos
+
+3. Salve em arquivo: curl ... > resultado.json
+
+4. Visualize JSON formatado (Linux/Mac):
+   curl ... | jq '.'
+
+═══════════════════════════════════════════════════════════════════════════════
