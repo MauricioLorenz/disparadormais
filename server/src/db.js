@@ -3,47 +3,50 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const db = createClient({
-  url: process.env.TURSO_DATABASE_URL,
-  authToken: process.env.TURSO_AUTH_TOKEN,
+  url: process.env.TURSO_DATABASE_URL || 'file:local.db',
+  authToken: process.env.TURSO_AUTH_TOKEN || undefined,
 });
 
 export async function initDb() {
-  await db.batch([
-    `CREATE TABLE IF NOT EXISTS clientes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nome TEXT NOT NULL,
-      telefone TEXT NOT NULL UNIQUE,
-      estados_interesse TEXT NOT NULL,
-      cache_tier TEXT NOT NULL,
-      cache_min INTEGER NOT NULL,
-      cache_max INTEGER NOT NULL,
-      ativo BOOLEAN DEFAULT 1
-    )`,
-    `CREATE TABLE IF NOT EXISTS ofertas (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      artista TEXT NOT NULL,
-      data TEXT NOT NULL,
-      estados TEXT NOT NULL,
-      cache_medio INTEGER NOT NULL,
-      data_recebimento DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`,
-    `CREATE TABLE IF NOT EXISTS templates (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nome TEXT NOT NULL,
-      texto TEXT NOT NULL,
-      padrao BOOLEAN DEFAULT 0
-    )`,
-    `CREATE TABLE IF NOT EXISTS disparos (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      oferta_id INTEGER NOT NULL,
-      cliente_id INTEGER NOT NULL,
-      mensagem TEXT NOT NULL,
-      status TEXT NOT NULL,
-      data_disparo DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (oferta_id) REFERENCES ofertas (id) ON DELETE CASCADE,
-      FOREIGN KEY (cliente_id) REFERENCES clientes (id) ON DELETE CASCADE
-    )`,
-  ], 'deferred');
+  await db.batch(
+    [
+      `CREATE TABLE IF NOT EXISTS clientes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        telefone TEXT NOT NULL UNIQUE,
+        estados_interesse TEXT NOT NULL,
+        cache_tier TEXT NOT NULL,
+        cache_min INTEGER NOT NULL,
+        cache_max INTEGER NOT NULL,
+        ativo BOOLEAN DEFAULT 1
+      )`,
+      `CREATE TABLE IF NOT EXISTS ofertas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        artista TEXT NOT NULL,
+        data TEXT NOT NULL,
+        estados TEXT NOT NULL,
+        cache_medio INTEGER NOT NULL,
+        data_recebimento DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS templates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        texto TEXT NOT NULL,
+        padrao BOOLEAN DEFAULT 0
+      )`,
+      `CREATE TABLE IF NOT EXISTS disparos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        oferta_id INTEGER NOT NULL,
+        cliente_id INTEGER NOT NULL,
+        mensagem TEXT NOT NULL,
+        status TEXT NOT NULL,
+        data_disparo DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (oferta_id) REFERENCES ofertas (id) ON DELETE CASCADE,
+        FOREIGN KEY (cliente_id) REFERENCES clientes (id) ON DELETE CASCADE
+      )`,
+    ],
+    'deferred'
+  );
 
   // Seed template padrão se não existir
   const { rows } = await db.execute('SELECT count(*) as count FROM templates');
@@ -58,5 +61,10 @@ export async function initDb() {
     });
   }
 }
+
+// Inicializa o banco ao carregar o módulo — evita race condition na Vercel
+export const dbReady = initDb().catch((err) => {
+  console.error('Falha ao inicializar banco de dados:', err);
+});
 
 export default db;

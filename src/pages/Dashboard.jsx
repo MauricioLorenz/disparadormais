@@ -112,7 +112,7 @@ export default function Dashboard() {
                           {new Date(d.data_disparo).toLocaleString('pt-BR')}
                         </td>
                         <td className="px-6 py-4 font-medium text-zinc-200">{d.cliente_nome}</td>
-                        <td className="px-6 py-4 text-brand-400">{d.artista}</td>
+                        <td className="px-6 py-4 text-brand-400">{d.artista_nome}</td>
                         <td className="px-6 py-4 max-w-xs truncate" title={d.mensagem}>
                           {d.mensagem.substring(0, 40)}...
                         </td>
