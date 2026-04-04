@@ -7,7 +7,10 @@ dotenv.config();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+
+// Parseia JSON independente do Content-Type (necessário para Vercel serverless e webhooks)
+app.use(express.json({ type: ['application/json', 'text/plain', '*/*'] }));
+app.use(express.urlencoded({ extended: true }));
 
 // Rotas Básicas de Verificação
 app.get('/api/status', (_req, res) => {
