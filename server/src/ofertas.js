@@ -52,6 +52,35 @@ function montarMensagem(templateTexto, cliente, ofertasDoCliente) {
   return `${topo}\n\n${listaOfertas}\n${secaoRodape}`;
 }
 
+// Envio via Evolution API — retorna { ok, motivo }
+async function enviarWhatsApp(telefone, mensagem) {
+  const evoUrl      = process.env.EVO_API_URL;
+  const evoInstance = process.env.EVO_INSTANCE_NAME;
+  const evoToken    = process.env.EVO_API_TOKEN;
+
+  if (!evoUrl || !evoInstance || !evoToken) {
+    console.warn('Credenciais da Evolution API não configuradas (EVO_API_URL, EVO_INSTANCE_NAME, EVO_API_TOKEN).');
+    return { ok: false, motivo: 'EVO_NAO_CONFIGURADO' };
+  }
+
+  try {
+    let numFormatado = telefone.replace(/\D/g, '');
+    if (numFormatado.length === 10 || numFormatado.length === 11) numFormatado = `55${numFormatado}`;
+
+    const response = await axios.post(
+      `${evoUrl}/message/sendText/${evoInstance}`,
+      { number: numFormatado, text: mensagem },
+      { headers: { 'Content-Type': 'application/json', 'apikey': evoToken } }
+    );
+    const ok = response.status === 200 || response.status === 201;
+    return { ok, motivo: ok ? null : 'API_STATUS_INESPERADO' };
+  } catch (error) {
+    const detalhe = error?.response?.data || error.message;
+    console.error('Erro na Evolution API:', detalhe);
+    return { ok: false, motivo: 'FALHA_API', detalhe };
+  }
+}
+
 // ─── Rotas ──────────────────────────────────────────────────────────────────
 
 // Listar todas as ofertas recebidas
@@ -114,23 +143,28 @@ async function processarMatchDeOferta(ofertaId, ofertaData) {
     const estadosCliente = cliente.estados_interesse.split(',').map(e => e.trim().toUpperCase());
     const estadosMatch = estadosCliente.some(ec => estadosOferta.includes(ec));
 
-    if (cacheMatch && estadosMatch) {
-      const ofertaObj = { artista, data, estados, cache_medio };
-      const mensagem = montarMensagem(templateDb.texto, cliente, [ofertaObj]);
+    if (!cacheMatch || !estadosMatch) {
+      console.log(`Cliente ${cliente.nome} sem match (cache: ${cacheMatch}, estados: ${estadosMatch})`);
+      continue;
+    }
 
-      try {
-        const statusEnvio = await enviarWhatsApp(cliente.telefone, mensagem);
-        await db.execute({
-          sql: 'INSERT INTO disparos (oferta_id, cliente_id, mensagem, status) VALUES (?, ?, ?, ?)',
-          args: [ofertaId, cliente.id, mensagem, statusEnvio ? 'SUCESSO' : 'ERRO'],
-        });
-      } catch (err) {
-        console.error(`Erro ao disparar para cliente ID ${cliente.id}:`, err);
-        await db.execute({
-          sql: 'INSERT INTO disparos (oferta_id, cliente_id, mensagem, status) VALUES (?, ?, ?, ?)',
-          args: [ofertaId, cliente.id, '', 'ERRO - FALHA NA API'],
-        });
-      }
+    const ofertaObj = { artista, data, estados, cache_medio };
+    const mensagem = montarMensagem(templateDb.texto, cliente, [ofertaObj]);
+
+    try {
+      const { ok, motivo } = await enviarWhatsApp(cliente.telefone, mensagem);
+      const status = ok ? 'SUCESSO' : `ERRO - ${motivo}`;
+      await db.execute({
+        sql: 'INSERT INTO disparos (oferta_id, cliente_id, mensagem, status) VALUES (?, ?, ?, ?)',
+        args: [ofertaId, cliente.id, mensagem, status],
+      });
+      console.log(`Disparo para ${cliente.nome}: ${status}`);
+    } catch (err) {
+      console.error(`Erro ao disparar para cliente ID ${cliente.id}:`, err);
+      await db.execute({
+        sql: 'INSERT INTO disparos (oferta_id, cliente_id, mensagem, status) VALUES (?, ?, ?, ?)',
+        args: [ofertaId, cliente.id, '', 'ERRO - FALHA NA API'],
+      });
     }
   }
 }
@@ -178,6 +212,8 @@ router.post('/lote/reenviar', async (req, res) => {
 
     let sucessos = 0;
     let erros = 0;
+    let semMatch = 0;
+    let motivoErro = null;
     const resultados = [];
 
     for (const cliente of clientes) {
@@ -189,13 +225,20 @@ router.post('/lote/reenviar', async (req, res) => {
         return cacheMatch && estadosMatch;
       });
 
-      if (ofertasDoCliente.length === 0) continue;
+      if (ofertasDoCliente.length === 0) {
+        semMatch++;
+        resultados.push({ cliente: cliente.nome, status: 'SEM_MATCH', detalhe: `cache: ${cliente.cache_min}-${cliente.cache_max}, estados: ${cliente.estados_interesse}` });
+        continue;
+      }
 
       const mensagem = montarMensagem(templateDb.texto, cliente, ofertasDoCliente);
 
       try {
-        const statusEnvio = await enviarWhatsApp(cliente.telefone, mensagem);
-        const status = statusEnvio ? 'SUCESSO' : 'ERRO';
+        const { ok, motivo, detalhe } = await enviarWhatsApp(cliente.telefone, mensagem);
+        const status = ok ? 'SUCESSO' : `ERRO - ${motivo}`;
+        if (!ok && motivo) motivoErro = motivo === 'EVO_NAO_CONFIGURADO'
+          ? 'Evolution API não configurada no servidor (variáveis EVO_API_URL, EVO_INSTANCE_NAME, EVO_API_TOKEN ausentes)'
+          : (detalhe ? JSON.stringify(detalhe) : motivo);
 
         for (const oferta of ofertasDoCliente) {
           await db.execute({
@@ -203,12 +246,12 @@ router.post('/lote/reenviar', async (req, res) => {
             args: [oferta.id, cliente.id, mensagem, status],
           });
 
-          if (statusEnvio) {
+          if (ok) {
             sucessos++;
             resultados.push({ oferta_id: oferta.id, artista: oferta.artista, cliente: cliente.nome, status: 'SUCESSO' });
           } else {
             erros++;
-            resultados.push({ oferta_id: oferta.id, artista: oferta.artista, cliente: cliente.nome, status: 'ERRO' });
+            resultados.push({ oferta_id: oferta.id, artista: oferta.artista, cliente: cliente.nome, status, detalhe: motivoErro });
           }
         }
       } catch (err) {
@@ -219,12 +262,20 @@ router.post('/lote/reenviar', async (req, res) => {
             args: [oferta.id, cliente.id, mensagem, 'ERRO - FALHA NA API'],
           });
           erros++;
-          resultados.push({ oferta_id: oferta.id, artista: oferta.artista, cliente: cliente.nome, status: 'ERRO' });
+          resultados.push({ oferta_id: oferta.id, artista: oferta.artista, cliente: cliente.nome, status: 'ERRO - FALHA NA API' });
         }
       }
     }
 
-    res.json({ message: `Reenvio concluído. ${sucessos} disparo(s) realizado(s), ${erros} erro(s)`, sucessos, erros, total: sucessos + erros, resultados });
+    res.json({
+      message: `Reenvio concluído. ${sucessos} enviado(s), ${erros} erro(s), ${semMatch} sem match.`,
+      sucessos,
+      erros,
+      semMatch,
+      motivoErro,
+      total: sucessos + erros,
+      resultados,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -270,6 +321,8 @@ router.post('/:ofertaId/reenviar', async (req, res) => {
 
     let sucessos = 0;
     let erros = 0;
+    let semMatch = 0;
+    let motivoErro = null;
     const resultados = [];
 
     for (const cliente of clientes) {
@@ -277,19 +330,28 @@ router.post('/:ofertaId/reenviar', async (req, res) => {
       const estadosCliente = cliente.estados_interesse.split(',').map(e => e.trim().toUpperCase());
       const estadosMatch = estadosCliente.some(ec => estadosOferta.includes(ec));
 
-      if (!cacheMatch || !estadosMatch) continue;
+      if (!cacheMatch || !estadosMatch) {
+        semMatch++;
+        resultados.push({ cliente: cliente.nome, status: 'SEM_MATCH', detalhe: `cache: ${cliente.cache_min}-${cliente.cache_max}, estados: ${cliente.estados_interesse}` });
+        continue;
+      }
 
       const mensagem = montarMensagem(templateDb.texto, cliente, [oferta]);
 
       try {
-        const statusEnvio = await enviarWhatsApp(cliente.telefone, mensagem);
+        const { ok, motivo, detalhe } = await enviarWhatsApp(cliente.telefone, mensagem);
+        const status = ok ? 'SUCESSO' : `ERRO - ${motivo}`;
+        if (!ok && motivo) motivoErro = motivo === 'EVO_NAO_CONFIGURADO'
+          ? 'Evolution API não configurada no servidor (variáveis EVO_API_URL, EVO_INSTANCE_NAME, EVO_API_TOKEN ausentes)'
+          : (detalhe ? JSON.stringify(detalhe) : motivo);
+
         await db.execute({
           sql: 'INSERT INTO disparos (oferta_id, cliente_id, mensagem, status) VALUES (?, ?, ?, ?)',
-          args: [ofertaId, cliente.id, mensagem, statusEnvio ? 'SUCESSO' : 'ERRO'],
+          args: [ofertaId, cliente.id, mensagem, status],
         });
 
-        if (statusEnvio) { sucessos++; resultados.push({ cliente: cliente.nome, status: 'SUCESSO' }); }
-        else             { erros++;    resultados.push({ cliente: cliente.nome, status: 'ERRO' }); }
+        if (ok) { sucessos++; resultados.push({ cliente: cliente.nome, status: 'SUCESSO' }); }
+        else     { erros++;    resultados.push({ cliente: cliente.nome, status, detalhe: motivoErro }); }
       } catch (err) {
         console.error(`Erro ao enviar para ${cliente.nome}:`, err);
         await db.execute({
@@ -297,41 +359,21 @@ router.post('/:ofertaId/reenviar', async (req, res) => {
           args: [ofertaId, cliente.id, '', 'ERRO - FALHA NA API'],
         });
         erros++;
-        resultados.push({ cliente: cliente.nome, status: 'ERRO' });
+        resultados.push({ cliente: cliente.nome, status: 'ERRO - FALHA NA API' });
       }
     }
 
-    res.json({ message: `Reenvio concluído. ${sucessos} sucesso(s), ${erros} erro(s)`, sucessos, erros, resultados });
+    res.json({
+      message: `Reenvio concluído. ${sucessos} enviado(s), ${erros} erro(s), ${semMatch} sem match.`,
+      sucessos,
+      erros,
+      semMatch,
+      motivoErro,
+      resultados,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
-
-// Envio via Evolution API
-async function enviarWhatsApp(telefone, mensagem) {
-  const evoUrl      = process.env.EVO_API_URL;
-  const evoInstance = process.env.EVO_INSTANCE_NAME;
-  const evoToken    = process.env.EVO_API_TOKEN;
-
-  if (!evoUrl || !evoInstance || !evoToken) {
-    console.warn('Credenciais da Evolution API não configuradas. Ignorando envio real.');
-    return false;
-  }
-
-  try {
-    let numFormatado = telefone.replace(/\D/g, '');
-    if (numFormatado.length === 10 || numFormatado.length === 11) numFormatado = `55${numFormatado}`;
-
-    const response = await axios.post(
-      `${evoUrl}/message/sendText/${evoInstance}`,
-      { number: numFormatado, text: mensagem },
-      { headers: { 'Content-Type': 'application/json', 'apikey': evoToken } }
-    );
-    return response.status === 201 || response.status === 200;
-  } catch (error) {
-    console.error('Erro na Evolution API:', error?.response?.data || error.message);
-    return false;
-  }
-}
 
 export default router;

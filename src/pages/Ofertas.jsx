@@ -80,12 +80,18 @@ export default function Ofertas() {
         : { clienteIds: clientesSelecionados };
 
       const resp = await api.post(endpoint, payload);
+      const { sucessos, erros, semMatch, motivoErro } = resp.data;
 
-      setMensagem(`✅ ${resp.data.sucessos} disparo(s) realizado(s) com sucesso`);
-      setTimeout(() => {
-        fecharModal();
-        carregarOfertas();
-      }, 2000);
+      if (sucessos > 0) {
+        setMensagem(`✅ ${sucessos} disparo(s) realizado(s) com sucesso`);
+        setTimeout(() => { fecharModal(); carregarOfertas(); }, 2000);
+      } else if (semMatch > 0 && erros === 0) {
+        setMensagem(`⚠️ Nenhum cliente selecionado tem match com esta oferta (cache ou estados incompatíveis)`);
+      } else if (motivoErro) {
+        setMensagem(`❌ Erro no envio: ${motivoErro}`);
+      } else {
+        setMensagem(`⚠️ ${erros} erro(s), ${semMatch} sem match. Verifique as configurações.`);
+      }
     } catch (error) {
       setMensagem(`❌ Erro: ${error.response?.data?.error || error.message}`);
     } finally {
